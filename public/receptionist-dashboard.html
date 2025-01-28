@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receptionist Dashboard</title>
+  <link rel="icon" href="Clinic Management System.webp">
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.21.0/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.21.0/firebase-auth.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background-image: url(bb.jpg);
+      background-repeat: no-repeat;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    body::-webkit-scrollbar{
+      display: none;
+    }
+
+    #dashboard {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      width: 90%;
+      max-width: 1100px;
+      height: 85vh;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 2fr; /* Two columns: left for buttons, right for list */
+      gap: 20px;
+      color: #333;
+      overflow: hidden;
+      
+    }
+
+    .form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .form input,
+    .form textarea,
+    .form button {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+
+    .form button {
+      background-color: #000000;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-radius: 10px;
+    }
+
+    .form button:hover {
+      background-color: #393939;
+    }
+
+    .alert {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+    }
+
+    .success {
+      color: green;
+      border-color: green;
+    }
+
+    .error {
+      color: red;
+      border-color: red;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 10px;
+      max-height: 500px;
+      overflow-y: auto;
+      border-radius: 10px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      border-color:#000000;
+      
+      
+    }
+    .grid-container::-webkit-scrollbar{
+      display: none;
+    }
+
+    .grid-item {
+      background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  text-align: center;
+  transition: transform 0.3s ease;
+  margin: 20px;
+  cursor: default;
+    }
+    .grid-item:hover{
+  transform: scale(1.1);   
+ }
+
+    .grid-item h4 {
+      margin: 5px 0;
+    }
+
+    .grid-item p {
+      margin: 2px 0;
+    }
+
+    .delete-button {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background-color: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: rgb(0, 0, 0);
+    }
+.delete-button:hover{
+  opacity: 0.5;
+}
+.delete-button:active{
+  background-color: #a3a3a3;
+}
+    #logoutButton {
+      margin-top: 20px;
+      padding: 10px;
+      background-color:#000000;
+      color:whit#fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 8px;
+      
+     
+    }
+
+    #logoutButton:hover {
+      background-color:#434040;
+    }
+    
+    
+  </style>  
+</head>
+<body>
+  <div id="dashboard">
+    <!-- Left Column: Form -->
+    <div>
+      <h2>Receptionist Dashboard</h2>
+      <p id="message"></p>
+      <form id="patientForm" class="form">
+        <input type="text" id="token" placeholder="Token" required>
+        <input type="text" id="name" placeholder="Name" required>
+        <input type="number" id="age" placeholder="Age" required>
+        <textarea id="history" placeholder="Medical History" required></textarea>
+        <button type="submit" id="addButton">Add Patient</button>
+      </form>
+      <a href="index.html">
+        <button id="logoutButton">Logout</button>
+      </a>
+    </div>
+
+    <!-- Right Column: Patient List -->
+    <div>
+      <h3>Patients List</h3>
+      <div class="grid-container" id="patients"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.21.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.21.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAzvfBXn8eWZJSpt8XekzrrpuAmAAa7ZWM",
+      authDomain: "clinic-management-system-86f47.firebaseapp.com",
+      projectId: "clinic-management-system-86f47",
+      storageBucket: "clinic-management-system-86f47.appspot.com",
+      messagingSenderId: "171142767966",
+      appId: "1:171142767966:web:5545b214a36997cc735bcf",
+      measurementId: "G-YVYBH67EHF",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const tokenInput = document.getElementById("token");
+    const nameInput = document.getElementById("name");
+    const ageInput = document.getElementById("age");
+    const historyInput = document.getElementById("history");
+    const patientForm = document.getElementById("patientForm");
+    const patientsGrid = document.getElementById("patients");
+    const messageDiv = document.getElementById("message");
+    const logoutButton = document.getElementById("logoutButton");
+
+    const fetchPatients = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "patients"));
+        patientsGrid.innerHTML = "";
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const patientId = doc.id;
+          const gridItem = document.createElement("div");
+          gridItem.className = "grid-item";
+          gridItem.innerHTML = `
+            <button class="delete-button" data-id="${patientId}">&times;</button>
+            <h4>${data.name}</h4>
+            <p><strong>Token:</strong> ${data.token}</p>
+            <p><strong>Age:</strong> ${data.age}</p>
+            <p><strong>History:</strong> ${data.history}</p>
+          `;
+          patientsGrid.appendChild(gridItem);
+        });
+
+        document.querySelectorAll(".delete-button").forEach((button) => {
+          button.addEventListener("click", async (e) => {
+            const patientId = e.target.getAttribute("data-id");
+            await deletePatient(patientId);
+          });
+        });
+      } catch (error) {
+        console.error(error);
+        messageDiv.textContent = "Error fetching patients.";
+        messageDiv.className = "alert error";
+      }
+    };
+
+    const deletePatient = async (id) => {
+      try {
+        await deleteDoc(doc(db, "patients", id));
+        messageDiv.textContent = "Patient deleted successfully.";
+        messageDiv.className = "alert success";
+        fetchPatients();
+      } catch (error) {
+        console.error(error);
+        messageDiv.textContent = "Error deleting patient.";
+        messageDiv.className = "alert error";
+      }
+    };
+
+    const addPatient = async (e) => {
+      e.preventDefault();
+      const token = tokenInput.value.trim();
+      const name = nameInput.value.trim();
+      const age = parseInt(ageInput.value.trim());
+      const history = historyInput.value.trim();
+
+      if (!token || !name || isNaN(age) || !history) {
+        messageDiv.textContent = "All fields are required and age must be a number.";
+        messageDiv.className = "alert error";
+        return;
+      }
+
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          messageDiv.textContent = "You must be logged in to add a patient.";
+          messageDiv.className = "alert error";
+          return;
+        }
+
+        await addDoc(collection(db, "patients"), {
+          token,
+          name,
+          age,
+          history,
+          addedBy: user.uid,
+        });
+
+        messageDiv.textContent = "Patient added successfully!";
+        messageDiv.className = "alert success";
+        patientForm.reset();
+        fetchPatients();
+      } catch (error) {
+        console.error(error);
+        messageDiv.textContent = "Error adding patient.";
+        messageDiv.className = "alert error";
+      }
+    };
+
+    const logout = () => {
+      signOut(auth)
+        .then(() => {
+          messageDiv.textContent = "Logged out successfully.";
+          messageDiv.className = "alert success";
+        })
+        .catch((error) => {
+          console.error(error);
+          messageDiv.textContent = "Error logging out.";
+          messageDiv.className = "alert error";
+        });
+    };
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        fetchPatients();
+      } else {
+        messageDiv.textContent = "Please log in.";
+        messageDiv.className = "alert error";
+      }
+    });
+
+    patientForm.addEventListener("submit", addPatient);
+    logoutButton.addEventListener("click", logout);
+  </script>
+</body>
+</html>

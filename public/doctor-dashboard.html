@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor Dashboard</title>
+  <link rel="icon" href="Clinic Management System.webp">
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.21.0/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.21.0/firebase-auth.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-image: url(bb.jpg);
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-attachment: fixed;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    body::-webkit-scrollbar{
+      display: none;
+    }
+
+  
+    #dashboard {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      width: 90%;
+      max-width: 1100px;
+      height: 85vh;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 2fr; /* Two columns: left for buttons, right for list */
+      gap: 20px;
+      color: #333;
+      overflow: hidden;
+    }
+  
+    #controls {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+  
+    #viewPatientsButton,
+    #logoutButton {
+      padding: 12px 20px;
+      font-size: 1rem;
+      background-color: #000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+  
+    #viewPatientsButton:hover,
+    #logoutButton:hover {
+      background-color: #444;
+    }
+  
+    #patientList {
+      display: none;
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    #patientList::-webkit-scrollbar{
+      display: none;
+    }
+  
+    h3 {
+      margin: 10px 0;
+      text-align: center;
+    }
+  
+    .grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* Creates 3 equal columns */
+  gap: 20px; /* Space between items */
+}
+.grid-container::-webkit-scrollbar{
+      display: none;
+    }
+.grid-item {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  text-align: center;
+  transition: transform 0.3s ease;
+  cursor: default;
+}
+
+.grid-item:hover {
+  transform: scale(1.05);
+}
+
+.grid-item h4 {
+  margin: 5px 0;
+  font-size: 1.2rem;
+  color: #000;
+}
+
+.grid-item p {
+  margin: 3px 0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+  
+    .alert {
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 1rem;
+    }
+  
+    .alert.success {
+      background-color: rgba(0, 255, 0, 0.1);
+      color: #008000;
+    }
+  
+    .alert.error {
+      background-color: rgba(255, 0, 0, 0.1);
+      color: #ff0000;
+    }
+  </style>
+  
+  
+</head>
+<body>
+  <div id="dashboard">
+    <h2>Doctor Dashboard</h2>
+    <p id="message"></p>
+    <div id="controls">
+      <button id="viewPatientsButton">View Patients</button>
+    </div>
+    <div id="patientList" style="display: none;">
+      <h3>Patients List</h3>
+      <div class="grid-container" id="patients"></div>
+    </div>
+    <a href="index.html">
+    <button id="logoutButton">Logout</button> </a>
+  </div>
+
+  <script type="module">
+    // Firebase configuration
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.21.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.21.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.21.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAzvfBXn8eWZJSpt8XekzrrpuAmAAa7ZWM",
+  authDomain: "clinic-management-system-86f47.firebaseapp.com",
+  projectId: "clinic-management-system-86f47",
+  storageBucket: "clinic-management-system-86f47.firebasestorage.app",
+  messagingSenderId: "171142767966",
+  appId: "1:171142767966:web:5545b214a36997cc735bcf",
+  measurementId: "G-YVYBH67EHF"
+
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const patientsGrid = document.getElementById("patients");
+    const messageDiv = document.getElementById("message");
+    const patientListDiv = document.getElementById("patientList");
+    const viewPatientsButton = document.getElementById("viewPatientsButton");
+    const logoutButton = document.getElementById("logoutButton");
+
+    const fetchPatients = async () => {
+      try {
+        messageDiv.textContent = "Loading patients...";
+        messageDiv.className = "alert";
+        const querySnapshot = await getDocs(collection(db, "patients"));
+        patientsGrid.innerHTML = ""; // Clear the grid
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const gridItem = document.createElement("div");
+          gridItem.className = "grid-item";
+          gridItem.innerHTML = `
+            <h4>${data.name}</h4>
+            <p><strong>Token:</strong> ${data.token}</p>
+            <p><strong>Age:</strong> ${data.age}</p>
+            <p><strong>History:</strong> ${data.history}</p>
+          `;
+          patientsGrid.appendChild(gridItem);
+        });
+        messageDiv.textContent = "Patients loaded successfully.";
+        messageDiv.className = "alert success";
+      } catch (error) {
+        console.error(error);
+        messageDiv.textContent = "Error loading patients.";
+        messageDiv.className = "alert error";
+      }
+    };
+
+    const handleViewPatients = () => {
+      patientListDiv.style.display = "block"; // Show the patients list
+      fetchPatients();
+    };
+
+    const logout = () => {
+      signOut(auth)
+        .then(() => {
+          messageDiv.textContent = "Logged out successfully.";
+          messageDiv.className = "alert success";
+        })
+        .catch((error) => {
+          console.error(error);
+          messageDiv.textContent = "Error logging out.";
+          messageDiv.className = "alert error";
+        });
+    };
+
+    // Authentication state listener
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        messageDiv.textContent = "Please log in.";
+        messageDiv.className = "alert error";
+      }
+    });
+
+    // Event listeners
+    viewPatientsButton.addEventListener("click", handleViewPatients);
+    logoutButton.addEventListener("click", logout);
+  </script>
+</body>
+</html>
+
