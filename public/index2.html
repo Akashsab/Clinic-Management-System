@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic AI Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url(bb.jpg);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .chat-container {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            width: 90%;
+            max-width: 1100px;
+            height: 85vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            color: #333;
+        }
+        .chat-box {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 20px;
+            overflow-y: auto;
+            height: 70vh;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .chat-box::-webkit-scrollbar {
+            display: none;
+        }
+        .message {
+            max-width: 60%;
+            padding: 12px;
+            border-radius: 10px;
+            margin: 8px 0;
+            word-wrap: break-word;
+            line-height: 1.5; /* Better line spacing */
+            font-size: 16px;
+        }
+        .sent {
+            align-self: flex-end;
+            background: #000001;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            padding: 12px 15px;
+            border-radius: 16px 16px 0 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+        .received {
+            align-self: flex-start;
+            background: #fff;
+            color: black;
+            text-align: left;
+            padding: 12px 15px;
+            border-radius: 16px 16px 16px 0;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            
+        }
+        .loading {
+            font-style: italic;
+            color: gray;
+            align-self: flex-start;
+        }
+        .input-box {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: transparent;
+            width: 260px;
+            border: none;
+            outline: none;
+            font-size: medium;
+        }
+        button {
+            width: 80px;
+            height: 40px;
+            background: #000001;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #434040;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h2>Clinic AI Chatbot</h2>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="input-box">
+            <input type="text" id="user-input" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const chatBox = document.getElementById("chat-box");
+            const chatHistory = JSON.parse(localStorage.getItem("chatHistory")) || [];
+            chatHistory.forEach(msg => {
+                const messageElement = document.createElement("div");
+                messageElement.classList.add("message", msg.type);
+                messageElement.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
+                chatBox.appendChild(messageElement);
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        async function sendMessage() {
+            const userInput = document.getElementById("user-input").value;
+            if (!userInput) return;
+
+            const chatBox = document.getElementById("chat-box");
+
+            const userMessage = document.createElement("div");
+            userMessage.classList.add("message", "sent");
+            userMessage.innerHTML = `<strong>You:</strong> ${userInput}`;
+            chatBox.appendChild(userMessage);
+            saveMessage("You", userInput, "sent");
+            document.getElementById("user-input").value = "";
+
+            const loadingMessage = document.createElement("div");
+            loadingMessage.classList.add("loading");
+            loadingMessage.innerHTML = "<strong>Bot:</strong> <em>typing...</em>";
+            chatBox.appendChild(loadingMessage);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            try {
+                const response = await fetch("http://localhost:3000/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: userInput })
+                });
+
+                const data = await response.json();
+                loadingMessage.remove();
+                displayTypewriterEffect(data.reply);
+            } catch (error) {
+                loadingMessage.remove();
+                const errorMessage = document.createElement("div");
+                errorMessage.classList.add("message", "received");
+                errorMessage.innerHTML = `<strong>Error:</strong> Could not reach server.`;
+                chatBox.appendChild(errorMessage);
+                saveMessage("Error", "Could not reach server.", "received");
+            }
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function displayTypewriterEffect(text) {
+            const chatBox = document.getElementById("chat-box");
+            const botMessage = document.createElement("div");
+            botMessage.classList.add("message", "received");
+            botMessage.innerHTML = "<strong>Bot:</strong> ";
+            chatBox.appendChild(botMessage);
+
+            let index = 0;
+            function type() {
+                if (index < text.length) {
+                    botMessage.innerHTML += text.charAt(index);
+                    index++;
+                    setTimeout(type, 10);
+                } else {
+                    saveMessage("Bot", text, "received");
+                }
+            }
+            type();
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function saveMessage(sender, text, type) {
+            const chatHistory = JSON.parse(localStorage.getItem("chatHistory")) || [];
+            chatHistory.push({ sender, text, type });
+            localStorage.setItem("chatHistory", JSON.stringify(chatHistory));
+        }
+    </script>
+</body>
+</html>
+
+
