@@ -127,10 +127,17 @@
         <div class="input-box">
             <input type="text" id="user-input" placeholder="Type a message...">
             <button onclick="sendMessage()">Send</button>
+            <button onclick="clearChat()" style="margin-left: 10px;">Clear</button>
         </div>
+        
+        
     </div>
 
     <script>
+         function clearChat() {
+        localStorage.removeItem("chatHistory"); // Clear chat history from local storage
+        document.getElementById("chat-box").innerHTML = ""; // Clear displayed messages
+    }
         document.addEventListener("DOMContentLoaded", () => {
             const chatBox = document.getElementById("chat-box");
             const chatHistory = JSON.parse(localStorage.getItem("chatHistory")) || [];
